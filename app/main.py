@@ -337,6 +337,15 @@ async def startup():
     load_config()
     QUEUE_DIR.mkdir(parents=True, exist_ok=True)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Recover orphaned processing files from previous crashes
+    for f in sorted(QUEUE_DIR.iterdir(), key=lambda p: p.stat().st_mtime):
+        if ".processing" in f.stem:
+            original_id = f.stem.split(".")[0]
+            recovered = f.with_name(f"{original_id}{f.suffix}")
+            print(f"Recovering stale file: {f.name} -> {recovered.name}")
+            f.rename(recovered)
+
     print(f"CUDA available: {torch.cuda.is_available()}")
     if torch.cuda.is_available():
         print(f"GPU: {torch.cuda.get_device_name(0)}")
