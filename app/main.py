@@ -9,7 +9,7 @@ import yaml
 import httpx
 import torch
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Query
 
 CONFIG_PATH = Path("/config/config.yaml")
 QUEUE_DIR = Path("/data/queue")
@@ -419,3 +419,51 @@ async def receive_recording(
     metapath.write_text(json.dumps(meta))
 
     return {"status": "ok", "call_id": call_id}
+
+
+@app.put("/recording/{token}/{rest:path}")
+async def receive_spintel_recording(
+    token: str,
+    rest: str,
+    request: Request,
+    from_: str = Query(default="", alias="from"),
+    to: str = Query(default=""),
+    caller_id_name: str = Query(default=""),
+    caller_id_number: str = Query(default=""),
+    call_id: str = Query(default=""),
+    cdr_id: str = Query(default=""),
+    interaction_id: str = Query(default=""),
+    account_id: str = Query(default=""),
+):
+    if token != config.get("token"):
+        raise HTTPException(401, "invalid token")
+
+    contents = await request.body()
+    size_mb = len(contents) / (1024 * 1024)
+    if size_mb > config.get("max_file_size_mb", 200):
+        raise HTTPException(413, f"file too large: {size_mb:.1f} MB")
+
+    uid = str(uuid.uuid4())
+    filename = f"{uid}.mp3"
+    meta = {
+        "call_id": call_id or uid,
+        "caller": caller_id_number or from_ or "",
+        "duration": 0,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "original_filename": rest,
+        "from": from_,
+        "to": to,
+        "caller_id_name": caller_id_name,
+        "caller_id_number": caller_id_number,
+        "cdr_id": cdr_id,
+        "interaction_id": interaction_id,
+        "account_id": account_id,
+    }
+
+    filepath = QUEUE_DIR / filename
+    filepath.write_bytes(contents)
+
+    metapath = QUEUE_DIR / f"{uid}.meta"
+    metapath.write_text(json.dumps(meta))
+
+    return {"status": "ok", "call_id": uid}
