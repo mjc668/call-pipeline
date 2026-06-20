@@ -24,7 +24,10 @@ ENTRY_RE = re.compile(
 
 def parse_monthly_files(month_prefix):
     entries = []
-    paths = sorted(OUTPUT_DIR.glob(f"{month_prefix}-*.md"))
+    year, month = month_prefix.split("-")
+    paths = sorted(OUTPUT_DIR.glob(f"{year}/{month}/*/transcription-*.md"))
+    if not paths:
+        paths = sorted(OUTPUT_DIR.glob(f"{month_prefix}-*.md"))
     for path in paths:
         content = path.read_text()
         for m in ENTRY_RE.finditer(content):
@@ -44,8 +47,9 @@ def parse_monthly_files(month_prefix):
                 else:
                     duration = int(duration_raw.rstrip("s"))
 
+            date_from_stem = path.stem.replace("transcription-", "")
             entries.append({
-                "date": path.stem,
+                "date": date_from_stem,
                 "hour": hour,
                 "caller": caller,
                 "duration": duration,
@@ -184,7 +188,7 @@ def main():
     report = generate_report(entries, args.month)
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    report_path = REPORTS_DIR / f"{args.month}-monthly-report.md"
+    report_path = REPORTS_DIR / f"{args.month}.md"
     report_path.write_text(report)
     print(f"Report saved to {report_path}")
 
