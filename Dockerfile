@@ -14,7 +14,10 @@ RUN pip install --no-cache-dir \
 RUN pip install --no-cache-dir \
     fastapi[standard] httpx pyyaml "numpy<2" "huggingface_hub<1.0" \
     pyannote-audio==3.1.1 && \
-    rm -rf /root/.cache /tmp/*
+    rm -rf /root/.cache /tmp/* && \
+    sed -i 's/np\.NaN/np.nan/g' /usr/local/lib/python3.11/site-packages/pyannote/audio/core/inference.py && \
+    sed -i 's/np\.NaN/np.nan/g' /usr/local/lib/python3.11/site-packages/pyannote/audio/tasks/segmentation/mixins.py && \
+    sed -i 's/np\.NaN/np.nan/g' /usr/local/lib/python3.11/site-packages/pyannote/audio/tasks/segmentation/speaker_diarization.py
 
 COPY app/ .
 
