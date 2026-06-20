@@ -1,3 +1,5 @@
 fastapi[standard]
 httpx
 pyyaml
+numpy<2
+huggingface_hub<1.0
