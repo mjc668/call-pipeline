@@ -235,7 +235,7 @@ def merge_transcript_diarization(words, diarization_segments):
     return "\n\n".join(output_parts) if output_parts else "[transcription failed]"
 
 
-def format_entry(caller, duration, transcript, ts, audio_relpath=None):
+def format_entry(caller, duration, transcript, ts, audio_relpath=None, meta=None):
     time_str = format_timestamp(ts)
     duration_str = ""
     if duration:
@@ -244,9 +244,19 @@ def format_entry(caller, duration, transcript, ts, audio_relpath=None):
     audio_link = ""
     if audio_relpath:
         audio_link = f"\n🔊 ![[{audio_relpath}]]\n"
+    meta_line = ""
+    if meta:
+        parts = []
+        for k in ("from", "to", "caller_id_name", "caller_id_number", "call_id", "cdr_id", "interaction_id", "account_id"):
+            v = meta.get(k)
+            if v:
+                label = k.replace("_", " ").title()
+                parts.append(f"{label}: {v}")
+        if parts:
+            meta_line = f"*{' | '.join(parts)}*\n\n"
     return (
         f"\n## {time_str} - {caller or 'Unknown'}{duration_str}\n\n"
-        f"{transcript}\n\n{audio_link}---\n"
+        f"{meta_line}{transcript}\n\n{audio_link}---\n"
     )
 
 
@@ -343,6 +353,7 @@ def worker_loop():
                     transcript,
                     ts,
                     audio_relpath=audio_relpath,
+                    meta=meta,
                 )
 
                 output_file.parent.mkdir(parents=True, exist_ok=True)
