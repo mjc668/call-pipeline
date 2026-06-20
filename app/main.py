@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import time
 import uuid
 import threading
@@ -123,11 +124,47 @@ def diarize_with_pyannote(resampled_path):
     return segments
 
 
-def get_speaker(t, diarization_segments):
+def get_speaker(t, diarization_segments, tolerance=0.3):
+    best = None
+    best_dist = tolerance
     for seg in diarization_segments:
         if seg["start"] <= t < seg["end"]:
             return seg["speaker"]
-    return None
+        d = min(abs(t - seg["start"]), abs(t - seg["end"]))
+        if d < best_dist:
+            best_dist = d
+            best = seg
+    return best["speaker"] if best else None
+
+
+NAME_PATTERNS = [
+    re.compile(r"my name is ([A-Z][a-z]+)", re.IGNORECASE),
+    re.compile(r"i'?m ([A-Z][a-z]+)", re.IGNORECASE),
+    re.compile(r"i am ([A-Z][a-z]+)", re.IGNORECASE),
+    re.compile(r"this is ([A-Z][a-z]+)", re.IGNORECASE),
+    re.compile(r"call me ([A-Z][a-z]+)", re.IGNORECASE),
+]
+
+def assign_speaker_names(transcript):
+    mapping = {}
+    for line in transcript.split("\n"):
+        m = re.match(r"\*\*(\w+)\*\*:\s*(.*)", line)
+        if not m:
+            continue
+        label, text = m.group(1), m.group(2)
+        if label in mapping:
+            continue
+        for pat in NAME_PATTERNS:
+            m2 = pat.search(text)
+            if m2 and m2.group(1)[0].isupper():
+                mapping[label] = m2.group(1)
+                break
+    if not mapping:
+        return transcript
+    result = transcript
+    for old, new in mapping.items():
+        result = result.replace(f"**{old}**", f"**{new}**")
+    return result
 
 
 def merge_transcript_diarization(words, diarization_segments):
@@ -211,6 +248,7 @@ def worker_loop():
                 if enable_diarization and hf_token:
                     diarization_segments = diarize_with_pyannote(resampled)
                     transcript = merge_transcript_diarization(words, diarization_segments)
+                    transcript = assign_speaker_names(transcript)
                 else:
                     if words:
                         transcript = " ".join(w["word"].strip() for w in words)
