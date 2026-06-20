@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir \
     fastapi[standard] httpx pyyaml \
     pyannote-audio==3.1.1 && \
     pip uninstall -y \
-        speechbrain pytorch-lightning lightning optuna \
+        speechbrain optuna \
         pandas matplotlib scikit-learn tensorboardX \
         sqlalchemy alembic pytorch-metric-learning \
         2>/dev/null && \
