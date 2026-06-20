@@ -11,3 +11,9 @@ speaches_model: "Systran/faster-whisper-small"
 # Speaker diarization (requires HF_TOKEN env var or hf_token below)
 enable_diarization: false
 hf_token: ""
+
+# Ollama LLM for reporting (topic extraction, summaries, retells)
+ollama:
+  url: "http://10.112.200.5:11434"
+  model: "qwen3:8b"
+  timeout: 120
