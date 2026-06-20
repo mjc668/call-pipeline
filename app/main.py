@@ -331,11 +331,13 @@ def worker_loop():
                 call_id = meta.get("call_id", af.stem)
                 ts = meta.get("timestamp", time.strftime("%Y-%m-%dT%H:%M:%S"))
                 date = format_date(ts)
-                output_file = OUTPUT_DIR / f"{date}.md"
+                year, month, day = date.split("-")
+                day_dir = OUTPUT_DIR / year / month / day
+                output_file = day_dir / f"transcription-{date}.md"
 
                 audio_relpath = None
                 try:
-                    audio_dir = OUTPUT_DIR / "audio" / date
+                    audio_dir = day_dir / "audio"
                     audio_dir.mkdir(parents=True, exist_ok=True)
                     mp3_path = audio_dir / f"{call_id}.mp3"
                     subprocess.run(
@@ -343,7 +345,7 @@ def worker_loop():
                          "-codec:a", "libmp3lame", "-b:a", "64k", str(mp3_path)],
                         capture_output=True
                     )
-                    audio_relpath = f"audio/{date}/{call_id}.mp3"
+                    audio_relpath = f"audio/{call_id}.mp3"
                 except Exception:
                     pass
 
