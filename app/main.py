@@ -131,8 +131,16 @@ def get_speaker(t, diarization_segments):
 
 
 def merge_transcript_diarization(words, diarization_segments):
-    if not words:
+    if not words and not diarization_segments:
         return "[transcription failed]"
+
+    # Fallback: no word-level timestamps, return speaker timeline
+    if not words:
+        parts = []
+        for seg in diarization_segments:
+            label = seg.get("speaker", "SPEAKER_UNKNOWN")
+            parts.append(f"**{label}**: [{seg['start']:.1f}s-{seg['end']:.1f}s]")
+        return "\n\n".join(parts) if parts else "[transcription failed]"
 
     output_parts = []
     current_spk = None
@@ -152,10 +160,7 @@ def merge_transcript_diarization(words, diarization_segments):
     if current_text:
         output_parts.append(f"**{current_spk}**: {' '.join(current_text)}")
 
-    if not output_parts:
-        return "[transcription failed]"
-
-    return "\n\n".join(output_parts)
+    return "\n\n".join(output_parts) if output_parts else "[transcription failed]"
 
 
 def format_entry(caller, duration, transcript, ts):
