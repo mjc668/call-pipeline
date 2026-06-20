@@ -188,7 +188,7 @@ def main():
     report = generate_report(entries, args.month)
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    report_path = REPORTS_DIR / f"{args.month}.md"
+    report_path = REPORTS_DIR / f"{args.month}-report.md"
     report_path.write_text(report)
     print(f"Report saved to {report_path}")
 
