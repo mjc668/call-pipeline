@@ -12,6 +12,9 @@ speaches_model: "Systran/faster-whisper-small"
 enable_diarization: false
 hf_token: ""
 
+# Timezone for timestamps
+timezone: "Australia/Sydney"
+
 # Ollama LLM for reporting (topic extraction, summaries, retells)
 ollama:
   url: "http://10.112.200.5:11434"
