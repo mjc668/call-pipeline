@@ -55,6 +55,9 @@ def get_diarization_pipeline():
     global diarization_pipeline
     with MODEL_LOCK:
         if diarization_pipeline is None:
+            import torch
+            _orig = torch.load
+            torch.load = lambda *a, **kw: _orig(*a, **{**kw, 'weights_only': False})
             from pyannote.audio import Pipeline
             hf_token = config.get("hf_token", "")
             if not hf_token:
