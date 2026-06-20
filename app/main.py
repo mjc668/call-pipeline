@@ -163,15 +163,18 @@ def merge_transcript_diarization(words, diarization_segments):
     return "\n\n".join(output_parts) if output_parts else "[transcription failed]"
 
 
-def format_entry(caller, duration, transcript, ts):
+def format_entry(caller, duration, transcript, ts, audio_relpath=None):
     time_str = format_timestamp(ts)
     duration_str = ""
     if duration:
         mins, secs = divmod(int(duration), 60)
         duration_str = f" ({mins}m {secs}s)" if mins else f" ({secs}s)"
+    audio_link = ""
+    if audio_relpath:
+        audio_link = f"\n🔊 [Listen]({audio_relpath})\n"
     return (
         f"\n## {time_str} - {caller or 'Unknown'}{duration_str}\n\n"
-        f"{transcript}\n\n---\n"
+        f"{transcript}\n\n{audio_link}---\n"
     )
 
 
@@ -218,15 +221,31 @@ def worker_loop():
 
                 resampled.unlink(missing_ok=True)
 
+                call_id = meta.get("call_id", af.stem)
                 ts = meta.get("timestamp", time.strftime("%Y-%m-%dT%H:%M:%S"))
                 date = format_date(ts)
                 output_file = OUTPUT_DIR / f"{date}.md"
+
+                audio_relpath = None
+                try:
+                    audio_dir = OUTPUT_DIR / "audio" / date
+                    audio_dir.mkdir(parents=True, exist_ok=True)
+                    mp3_path = audio_dir / f"{call_id}.mp3"
+                    subprocess.run(
+                        ["ffmpeg", "-y", "-i", str(proc_path),
+                         "-codec:a", "libmp3lame", "-b:a", "64k", str(mp3_path)],
+                        capture_output=True
+                    )
+                    audio_relpath = f"audio/{date}/{call_id}.mp3"
+                except Exception:
+                    pass
 
                 entry = format_entry(
                     meta.get("caller", ""),
                     meta.get("duration", 0),
                     transcript,
                     ts,
+                    audio_relpath=audio_relpath,
                 )
 
                 output_file.parent.mkdir(parents=True, exist_ok=True)
