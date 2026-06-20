@@ -153,9 +153,9 @@ def merge_transcript_diarization(words, diarization_segments):
             if current_text:
                 output_parts.append(f"**{current_spk}**: {' '.join(current_text)}")
             current_spk = label
-            current_text = [word["word"]]
+            current_text = [word["word"].strip()]
         else:
-            current_text.append(word["word"])
+            current_text.append(word["word"].strip())
 
     if current_text:
         output_parts.append(f"**{current_spk}**: {' '.join(current_text)}")
