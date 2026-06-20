@@ -243,7 +243,7 @@ def format_entry(caller, duration, transcript, ts, audio_relpath=None):
         duration_str = f" ({mins}m {secs}s)" if mins else f" ({secs}s)"
     audio_link = ""
     if audio_relpath:
-        audio_link = f"\n🔊 [Listen]({audio_relpath})\n"
+        audio_link = f"\n🔊 ![[{audio_relpath}]]\n"
     return (
         f"\n## {time_str} - {caller or 'Unknown'}{duration_str}\n\n"
         f"{transcript}\n\n{audio_link}---\n"
