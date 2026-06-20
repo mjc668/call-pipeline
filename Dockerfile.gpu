@@ -1,0 +1,18 @@
+FROM python:3.11-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install everything in a single layer — CUDA PyTorch + faster-whisper + pyannote
+RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
+    pip install --no-cache-dir faster-whisper pyannote-audio uvicorn fastapi python-multipart pyyaml && \
+    rm -rf /root/.cache /tmp/*
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && rm -rf /root/.cache /tmp/*
+COPY app/ .
+
+EXPOSE 8443
+CMD ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8443"]

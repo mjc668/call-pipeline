@@ -1,0 +1,13 @@
+# API token
+token: "5c122272bd525180fc6d8e6835f5387a79de75900a00ddb8a5731f4593561da9"
+
+# Max audio file size in MB
+max_file_size_mb: 200
+
+# Speaches API server (transcription)
+speaches_url: "http://10.112.200.5:8002"
+speaches_model: "Systran/faster-whisper-small"
+
+# Speaker diarization (requires HF_TOKEN env var or hf_token below)
+enable_diarization: false
+hf_token: ""
