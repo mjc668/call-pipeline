@@ -10,7 +10,7 @@ from collections import Counter
 OUTPUT_DIR = Path("/output")
 REPORTS_DIR = OUTPUT_DIR / "reports"
 OLLAMA_URL = "http://10.112.200.5:11434/api/generate"
-OLLAMA_MODEL = "qwen3"
+OLLAMA_MODEL = "qwen3:8b"
 httpx_client = httpx.Client(timeout=120.0)
 
 ENTRY_RE = re.compile(
@@ -88,7 +88,10 @@ def query_ollama(transcript, retries=3):
             if resp.status_code != 200:
                 continue
             data = resp.json()
-            return json.loads(data["response"])
+            result = json.loads(data["response"])
+            if isinstance(result, dict):
+                return result
+            return {"car_brands": [], "car_models": [], "topics": []}
         except Exception as e:
             if attempt == retries - 1:
                 print(f"  Ollama error after {retries} retries: {e}")
