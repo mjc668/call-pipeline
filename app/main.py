@@ -114,6 +114,9 @@ def diarize_with_pyannote(resampled_path):
     pipeline = get_diarization_pipeline()
     diarization = pipeline({"audio": str(resampled_path)})
 
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
     segments = []
     for turn, _, speaker in diarization.itertracks(yield_label=True):
         segments.append({
