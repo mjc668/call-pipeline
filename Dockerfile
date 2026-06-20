@@ -20,6 +20,7 @@ RUN pip install --no-cache-dir \
     sed -i 's/np\.NaN/np.nan/g' /usr/local/lib/python3.11/site-packages/pyannote/audio/tasks/segmentation/speaker_diarization.py
 
 COPY app/ .
+COPY reporting/ /app/reporting/
 
 EXPOSE 8443
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8443"]
