@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir \
     --index-url https://download.pytorch.org/whl/cu124
 
 RUN pip install --no-cache-dir \
-    fastapi[standard] httpx pyyaml \
+    fastapi[standard] httpx pyyaml "numpy<2" "huggingface_hub<1.0" \
     pyannote-audio==3.1.1 && \
     rm -rf /root/.cache /tmp/*
 
