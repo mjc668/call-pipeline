@@ -167,6 +167,38 @@ def assign_speaker_names(transcript):
     return result
 
 
+def cleanup_unknowns(transcript):
+    lines = transcript.split("\n")
+    result = []
+    buf = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if not line.strip():
+            i += 1
+            continue
+        m = re.match(r"\*\*SPEAKER_UNKNOWN\*\*:\s*(.*)", line)
+        if m:
+            buf.append(m.group(1).strip())
+            i += 1
+            continue
+        if buf and re.match(r"\*\*(?!SPEAKER_UNKNOWN)\w+\*\*:\s*", line):
+            text = " ".join(buf)
+            rest = re.sub(r"^\*\*\w+\*\*:\s*", "", line)
+            result.append(f"{line.split(':')[0]}: {text} {rest}")
+            buf = []
+            i += 1
+            continue
+        if buf:
+            result.extend(f"**SPEAKER_UNKNOWN**: {w}" for w in buf)
+            buf = []
+        result.append(line)
+        i += 1
+    if buf:
+        result.extend(f"**SPEAKER_UNKNOWN**: {w}" for w in buf)
+    return "\n".join(result)
+
+
 def merge_transcript_diarization(words, diarization_segments):
     if not words and not diarization_segments:
         return "[transcription failed]"
@@ -248,6 +280,7 @@ def worker_loop():
                 if enable_diarization and hf_token:
                     diarization_segments = diarize_with_pyannote(resampled)
                     transcript = merge_transcript_diarization(words, diarization_segments)
+                    transcript = cleanup_unknowns(transcript)
                     transcript = assign_speaker_names(transcript)
                 else:
                     if words:
