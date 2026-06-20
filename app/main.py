@@ -250,7 +250,30 @@ def format_entry(caller, duration, transcript, ts, audio_relpath=None):
     )
 
 
+def warmup_speaches():
+    speaches_url = config.get("speaches_url", "http://10.112.200.5:8002")
+    model = config.get("speaches_model", "Systran/faster-whisper-small")
+    import io, struct, wave
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16000)
+        w.writeframes(struct.pack(f"<{16000}h", *[0]*16000))
+    buf.seek(0)
+    try:
+        r = httpx_client.post(
+            f"{speaches_url}/v1/audio/transcriptions",
+            data={"model": model, "language": "en"},
+            files={"file": ("silence.wav", buf, "audio/wav")},
+        )
+        print(f"Warm-up: speaches ready ({r.status_code})")
+    except Exception as e:
+        print(f"Warm-up: speaches not ready yet ({e})")
+
+
 def worker_loop():
+    warmup_speaches()
     while True:
         try:
             files = [
