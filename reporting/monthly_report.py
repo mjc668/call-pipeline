@@ -66,7 +66,7 @@ def most_common_callers(entries, top=15):
 
 
 def query_ollama_for_report(transcript):
-    from reporting.ollama_helpers import query_ollama
+    from ollama_helpers import query_ollama
 
     text = transcript[:2000].strip()
     if not text:

@@ -90,7 +90,7 @@ def build_daily_summary(date_str, entries):
     stats = daily_stats(entries)
     full_text = build_full_transcript(entries)
 
-    from reporting.ollama_helpers import query_ollama
+    from ollama_helpers import query_ollama
 
     retell_prompt = (
         "You are a business analyst reviewing a day's call transcripts. "
