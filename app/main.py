@@ -172,7 +172,9 @@ def worker_loop():
         try:
             files = [
                 f for f in QUEUE_DIR.iterdir()
-                if f.suffix not in (".meta", ".processing", ".16k")
+                if f.suffix not in (".meta",)
+                and ".processing" not in f.stem
+                and ".16k" not in f.stem
                 and not f.name.startswith(".")
             ]
         except FileNotFoundError:
