@@ -3,15 +3,12 @@ import re
 import json
 import time
 import argparse
-import httpx
 from pathlib import Path
 from collections import Counter
+from datetime import datetime, timedelta
 
 OUTPUT_DIR = Path("/output")
 REPORTS_DIR = OUTPUT_DIR / "reports"
-OLLAMA_URL = "http://10.112.200.5:11434/api/generate"
-OLLAMA_MODEL = "qwen3:8b"
-httpx_client = httpx.Client(timeout=120.0)
 
 ENTRY_RE = re.compile(
     r"^## (\d{2}:\d{2}) - (.+?)(?: \(((?:\d+m \d+s|\d+s))\))?\n\n"
@@ -68,39 +65,29 @@ def most_common_callers(entries, top=15):
     return caller_counts.most_common(top)
 
 
-def query_ollama(transcript, retries=3):
+def query_ollama_for_report(transcript):
+    from reporting.ollama_helpers import query_ollama
+
     text = transcript[:2000].strip()
     if not text:
         return {"car_brands": [], "car_models": [], "topics": []}
 
-    prompt = (
+    prompt_template = (
         "Extract car brands, car models, and main topics from this call transcript. "
         "Return ONLY valid JSON with no explanation. "
-        'Format: {"car_brands":["..."],"car_models":["..."],"topics":["..."]}\n\n'
-        f"Transcript:\n{text}"
+        'Format: {{"car_brands":["..."],"car_models":["..."],"topics":["..."]}}\n\n'
+        "Transcript:\n{text}"
     )
-    payload = {
-        "model": OLLAMA_MODEL,
-        "prompt": prompt,
-        "format": "json",
-        "stream": False,
-    }
-
-    for attempt in range(retries):
-        try:
-            resp = httpx_client.post(OLLAMA_URL, json=payload)
-            if resp.status_code != 200:
-                continue
-            data = resp.json()
-            result = json.loads(data["response"])
-            if isinstance(result, dict):
-                return result
-            return {"car_brands": [], "car_models": [], "topics": []}
-        except Exception as e:
-            if attempt == retries - 1:
-                print(f"  Ollama error after {retries} retries: {e}")
-                return {"car_brands": [], "car_models": [], "topics": []}
-            time.sleep(2)
+    result = query_ollama(text, prompt_template)
+    if not result:
+        return {"car_brands": [], "car_models": [], "topics": []}
+    try:
+        parsed = json.loads(result)
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        pass
+    return {"car_brands": [], "car_models": [], "topics": []}
 
 
 def generate_report(entries, month_prefix):
@@ -116,7 +103,7 @@ def generate_report(entries, month_prefix):
 
     for i, entry in enumerate(entries):
         print(f"  Analyzing call {i+1}/{len(entries)} ...")
-        result = query_ollama(entry["transcript"])
+        result = query_ollama_for_report(entry["transcript"])
         for brand in result.get("car_brands", []):
             all_brands[brand.strip().title()] += 1
         for model in result.get("car_models", []):
@@ -171,13 +158,23 @@ def generate_report(entries, month_prefix):
     return "\n".join(lines)
 
 
+def resolve_month(month):
+    if month:
+        return month
+    today = datetime.now()
+    first_of_month = today.replace(day=1)
+    last_month = first_of_month - timedelta(days=1)
+    return last_month.strftime("%Y-%m")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate monthly call report")
-    parser.add_argument("--month", required=True, help="Month prefix like 2026-06")
+    parser.add_argument("--month", help="Month prefix like 2026-06 (default: previous month)")
     args = parser.parse_args()
 
-    print(f"Parsing files for {args.month} ...")
-    entries = parse_monthly_files(args.month)
+    month = resolve_month(args.month)
+    print(f"Parsing files for {month} ...")
+    entries = parse_monthly_files(month)
     print(f"Found {len(entries)} entries")
 
     if not entries:
@@ -185,10 +182,10 @@ def main():
         return
 
     print("Generating report ...")
-    report = generate_report(entries, args.month)
+    report = generate_report(entries, month)
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    report_path = REPORTS_DIR / f"{args.month}-report.md"
+    report_path = REPORTS_DIR / f"{month}-report.md"
     report_path.write_text(report)
     print(f"Report saved to {report_path}")
 
