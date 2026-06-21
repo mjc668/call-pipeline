@@ -320,13 +320,13 @@ def worker_loop():
                 and not f.name.startswith(".")
             ]
         except FileNotFoundError:
-            print("Worker: queue directory not found, retrying in 5s ...")
-            time.sleep(5)
+            print("Worker: queue directory not found, retrying in 300s ...")
+            time.sleep(300)
             continue
 
         if not files:
-            print("Worker: queue empty, sleeping 5s ...")
-            time.sleep(5)
+            print("Worker: queue empty, sleeping 300s ...")
+            time.sleep(300)
             continue
 
         print(f"Worker: found {len(files)} file(s) to process")
@@ -425,8 +425,8 @@ def worker_loop():
                 if resampled:
                     resampled.unlink(missing_ok=True)
 
-        print("Worker: batch complete, sleeping 5s ...")
-        time.sleep(5)
+        print("Worker: batch complete, sleeping 300s ...")
+        time.sleep(300)
 
 
 @app.on_event("startup")
