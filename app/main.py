@@ -302,18 +302,25 @@ def worker_loop():
 
             try:
                 af.rename(proc_path)
+                print(f"Processing {af.name} ...")
                 meta = {}
                 if meta_path.exists():
                     meta = json.loads(meta_path.read_text())
+                print(f"  Meta: caller={meta.get('caller','')}")
 
+                print(f"  Resampling ...")
                 resampled = resample_to_16k(proc_path)
+                print(f"  Transcribing ...")
                 words, segments = transcribe_with_speaches(resampled)
+                print(f"  Transcription: {len(words)} words, {len(segments)} segments")
 
                 enable_diarization = config.get("enable_diarization", False)
                 hf_token = config.get("hf_token", "")
 
                 if enable_diarization and hf_token:
+                    print(f"  Diarizing ...")
                     diarization_segments = diarize_with_pyannote(resampled)
+                    print(f"  Merging diarization ({len(diarization_segments)} segs) ...")
                     transcript = merge_transcript_diarization(words, diarization_segments)
                     transcript = cleanup_unknowns(transcript)
                     transcript = assign_speaker_names(transcript)
@@ -325,6 +332,7 @@ def worker_loop():
                     if not transcript.strip():
                         transcript = "[transcription failed]"
 
+                print(f"  Transcript length: {len(transcript)} chars")
                 resampled.unlink(missing_ok=True)
 
                 call_id = meta.get("call_id", af.stem)
@@ -345,8 +353,9 @@ def worker_loop():
                         capture_output=True
                     )
                     audio_relpath = f"audio/{call_id}.mp3"
-                except Exception:
-                    pass
+                    print(f"  MP3 saved to {mp3_path}")
+                except Exception as e:
+                    print(f"  MP3 conversion failed: {e}")
 
                 entry = format_entry(
                     meta.get("caller", ""),
@@ -357,12 +366,16 @@ def worker_loop():
                     meta=meta,
                 )
 
+                print(f"  Writing entry to {output_file}")
                 output_file.parent.mkdir(parents=True, exist_ok=True)
                 with open(output_file, "a") as f:
                     f.write(entry)
+                print(f"  Done: {call_id}")
 
             except Exception as e:
                 print(f"Error processing {af.name}: {e}")
+                import traceback
+                traceback.print_exc()
             finally:
                 for p in [proc_path, meta_path]:
                     p.unlink(missing_ok=True)
