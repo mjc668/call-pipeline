@@ -20,6 +20,7 @@ ENTRY_RE = re.compile(
 
 
 def parse_monthly_files(month_prefix):
+    """Read all transcription Markdown files for a given month and extract entries."""
     entries = []
     year, month = month_prefix.split("-")
     paths = sorted(OUTPUT_DIR.glob(f"{year}/{month}/*/transcription-*.md"))
@@ -56,16 +57,23 @@ def parse_monthly_files(month_prefix):
 
 
 def busiest_hours(entries):
+    """Return sorted list of (hour, call_count) tuples."""
     hour_counts = Counter(e["hour"] for e in entries)
     return sorted(hour_counts.items())
 
 
 def most_common_callers(entries, top=15):
+    """Return list of (caller, count) for the top N callers."""
     caller_counts = Counter(e["caller"] for e in entries)
     return caller_counts.most_common(top)
 
 
 def query_ollama_for_report(transcript):
+    """Extract car brands, car models, and topics from a transcript via Ollama.
+    
+    Returns a dict with keys car_brands, car_models, topics (each a list).
+    On failure or empty result, returns empty lists.
+    """
     from ollama_helpers import query_ollama
 
     text = transcript[:2000].strip()
@@ -91,6 +99,7 @@ def query_ollama_for_report(transcript):
 
 
 def generate_report(entries, month_prefix):
+    """Build the monthly Markdown report with stats and per-call Ollama analysis."""
     hours = busiest_hours(entries)
     callers = most_common_callers(entries)
 

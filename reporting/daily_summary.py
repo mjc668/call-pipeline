@@ -16,6 +16,7 @@ ENTRY_RE = re.compile(
 
 
 def resolve_date(raw):
+    """Parse date argument: literal date, "yesterday", or default to yesterday."""
     if raw == "yesterday":
         d = datetime.now() - timedelta(days=1)
         return d.strftime("%Y-%m-%d")
@@ -26,6 +27,7 @@ def resolve_date(raw):
 
 
 def parse_date_entries(date_str):
+    """Read transcription Markdown for a given date and extract call entries."""
     year, month, day = date_str.split("-")
     path = OUTPUT_DIR / year / month / day / f"transcription-{date_str}.md"
     if not path.exists():
@@ -60,6 +62,7 @@ def parse_date_entries(date_str):
 
 
 def daily_stats(entries):
+    """Compute aggregate stats (total calls, duration, busiest hour, unique callers)."""
     total_calls = len(entries)
     total_duration = sum(e["duration"] for e in entries)
     hours = Counter(e["hour"] for e in entries)
@@ -76,6 +79,7 @@ def daily_stats(entries):
 
 
 def build_full_transcript(entries):
+    """Concatenate all entries into a single text blob for Ollama ingestion."""
     parts = []
     for e in entries:
         parts.append(f"[{e['hour']:02d}:00 - {e['caller']}]\n{e['transcript']}")
@@ -83,6 +87,7 @@ def build_full_transcript(entries):
 
 
 def build_daily_summary(date_str, entries):
+    """Generate a daily-summary.md file with stats and an Ollama narrative retell."""
     year, month, day = date_str.split("-")
     day_dir = OUTPUT_DIR / year / month / day
     day_dir.mkdir(parents=True, exist_ok=True)

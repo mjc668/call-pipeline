@@ -5,6 +5,7 @@ import time
 import uuid
 import threading
 import subprocess
+import traceback
 import yaml
 import httpx
 import torch
@@ -15,12 +16,16 @@ CONFIG_PATH = Path("/config/config.yaml")
 QUEUE_DIR = Path("/data/queue")
 OUTPUT_DIR = Path("/output")
 
+SAMPLE_RATE = 16000
+SPEAKER_TOLERANCE = 0.3
+DEFAULT_HTTPX_TIMEOUT = 300.0
+
 config = {}
 diarization_pipeline = None
 MODEL_LOCK = threading.Lock()
 
 app = FastAPI(title="Call Pipeline")
-httpx_client = httpx.Client(timeout=300.0)
+httpx_client = httpx.Client(timeout=DEFAULT_HTTPX_TIMEOUT)
 
 
 def load_config():
@@ -41,10 +46,14 @@ def format_date(ts):
 
 
 def resample_to_16k(audio_path):
+    """Resample audio to 16kHz mono WAV for transcription/diarization.
+    
+    Returns path to the resampled file (audio_path.stem + ".16k.wav").
+    """
     resampled = audio_path.with_name(audio_path.stem + ".16k.wav")
     subprocess.run(
         ["ffmpeg", "-y", "-i", str(audio_path),
-         "-ar", "16000", "-ac", "1", "-sample_fmt", "s16",
+         "-ar", str(SAMPLE_RATE), "-ac", "1", "-sample_fmt", "s16",
          str(resampled)],
         capture_output=True, text=True
     )
@@ -75,6 +84,12 @@ def get_diarization_pipeline():
 
 
 def transcribe_with_speaches(resampled_path):
+    """Transcribe resampled audio via the speaches (Whisper) API.
+    
+    Returns (words, segments) where words is a list of {start, end, word}
+    dicts and segments is a list of {start, end, text} dicts.
+    Raises RuntimeError on non-200 response.
+    """
     speaches_url = config.get("speaches_url", "http://10.112.200.5:8002")
     model = config.get("speaches_model", "Systran/faster-whisper-small")
 
@@ -110,6 +125,11 @@ def transcribe_with_speaches(resampled_path):
 
 
 def diarize_with_pyannote(resampled_path):
+    """Run pyannote speaker diarization on resampled audio.
+    
+    Returns a list of {start, end, speaker} segments.
+    Requires hf_token configured and GPU recommended.
+    """
     pipeline = get_diarization_pipeline()
     diarization = pipeline({"audio": str(resampled_path)}, min_speakers=2)
 
@@ -126,7 +146,7 @@ def diarize_with_pyannote(resampled_path):
     return segments
 
 
-def get_speaker(t, diarization_segments, tolerance=0.3):
+def get_speaker(t, diarization_segments, tolerance=SPEAKER_TOLERANCE):
     best = None
     best_dist = tolerance
     for seg in diarization_segments:
@@ -267,8 +287,8 @@ def warmup_speaches():
     with wave.open(buf, "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
-        w.setframerate(16000)
-        w.writeframes(struct.pack(f"<{16000}h", *[0]*16000))
+        w.setframerate(SAMPLE_RATE)
+        w.writeframes(struct.pack(f"<{SAMPLE_RATE}h", *[0]*SAMPLE_RATE))
     buf.seek(0)
     try:
         r = httpx_client.post(
@@ -282,8 +302,15 @@ def warmup_speaches():
 
 
 def worker_loop():
+    """Background loop monitoring QUEUE_DIR for new audio files.
+    
+    Picks up files in order of modification time, resamples, transcribes
+    via speaches, optionally diarizes via pyannote, and writes formatted
+    Markdown entries to OUTPUT_DIR.
+    """
     warmup_speaches()
     while True:
+        print("Worker: scanning queue ...")
         try:
             files = [
                 f for f in QUEUE_DIR.iterdir()
@@ -293,12 +320,20 @@ def worker_loop():
                 and not f.name.startswith(".")
             ]
         except FileNotFoundError:
+            print("Worker: queue directory not found, retrying in 5s ...")
             time.sleep(5)
             continue
 
+        if not files:
+            print("Worker: queue empty, sleeping 5s ...")
+            time.sleep(5)
+            continue
+
+        print(f"Worker: found {len(files)} file(s) to process")
         for af in sorted(files, key=lambda p: p.stat().st_mtime):
             meta_path = af.with_suffix(".meta")
             proc_path = af.with_name(af.stem + ".processing.wav")
+            resampled = None
 
             try:
                 af.rename(proc_path)
@@ -372,14 +407,25 @@ def worker_loop():
                     f.write(entry)
                 print(f"  Done: {call_id}")
 
+            except httpx.RequestError as e:
+                print(f"HTTP request error processing {af.name}: {e}")
+                traceback.print_exc()
+            except subprocess.CalledProcessError as e:
+                print(f"Subprocess error processing {af.name}: {e}")
+                traceback.print_exc()
+            except (json.JSONDecodeError, RuntimeError) as e:
+                print(f"Data error processing {af.name}: {e}")
+                traceback.print_exc()
             except Exception as e:
-                print(f"Error processing {af.name}: {e}")
-                import traceback
+                print(f"Unexpected error processing {af.name}: {e}")
                 traceback.print_exc()
             finally:
                 for p in [proc_path, meta_path]:
                     p.unlink(missing_ok=True)
+                if resampled:
+                    resampled.unlink(missing_ok=True)
 
+        print("Worker: batch complete, sleeping 5s ...")
         time.sleep(5)
 
 
@@ -401,6 +447,8 @@ async def startup():
     if torch.cuda.is_available():
         print(f"GPU: {torch.cuda.get_device_name(0)}")
     print(f"Config: enable_diarization={config.get('enable_diarization', False)}, hf_token={'set' if config.get('hf_token') else 'not set'}")
+    if config.get("enable_diarization", False) and not config.get("hf_token"):
+        print("WARNING: diarization enabled but hf_token not set — diarization will be skipped")
     t = threading.Thread(target=worker_loop, daemon=True)
     t.start()
 
@@ -418,6 +466,11 @@ async def receive_recording(
     duration: int = Form(default=0),
     timestamp: str = Form(default=""),
 ):
+    """Receive a call recording with basic metadata.
+    
+    Validates token, checks file size, writes audio and .meta
+    to QUEUE_DIR for the worker to process.
+    """
     if token != config.get("token"):
         raise HTTPException(401, "invalid token")
 
@@ -460,6 +513,11 @@ async def receive_spintel_recording(
     interaction_id: str = Query(default=""),
     account_id: str = Query(default=""),
 ):
+    """Receive a call recording from Spintel with enhanced metadata.
+    
+    Supports query parameters for caller ID, CDR, and account info.
+    Audio is written as MP3 to QUEUE_DIR with a .meta sidecar.
+    """
     if token != config.get("token"):
         raise HTTPException(401, "invalid token")
 

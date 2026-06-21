@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import traceback
 import yaml
 import httpx
 from pathlib import Path
@@ -13,6 +14,11 @@ DEFAULT_TIMEOUT = 120
 
 
 def load_ollama_config():
+    """Load Ollama connection config from config.yaml, env vars, or defaults.
+    
+    Precedence: environment variables > config.yaml > DEFAULT_* constants.
+    Returns dict with url, model, timeout keys.
+    """
     cfg = {}
     config_path = os.environ.get("CONFIG_PATH", str(CONFIG_PATH))
     p = Path(config_path)
@@ -33,6 +39,12 @@ def load_ollama_config():
 
 
 def query_ollama(text, prompt_template, retries=3, format_json=False):
+    """Query Ollama with a prompt built from the given text and template.
+    
+    The prompt_template should contain a {text} placeholder. If format_json
+    is True, the "format": "json" parameter is sent to Ollama.
+    Returns the response string, or "" on failure after retries.
+    """
     if not text.strip():
         return ""
 
@@ -52,12 +64,14 @@ def query_ollama(text, prompt_template, retries=3, format_json=False):
         try:
             resp = client.post(cfg["url"], json=payload)
             if resp.status_code != 200:
+                print(f"  Ollama API error: status={resp.status_code}, body={resp.text[:500]}")
                 continue
             data = resp.json()
             return data.get("response", "")
         except Exception as e:
             if attempt == retries - 1:
-                print(f"  Ollama error: {e}")
+                print(f"  Ollama error (attempt {attempt+1}/{retries}): {e}")
+                traceback.print_exc()
                 return ""
             time.sleep(2)
 
