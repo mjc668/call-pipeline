@@ -27,9 +27,8 @@ def load_config():
     global config
     with open(CONFIG_PATH) as f:
         config = yaml.safe_load(f)
-    env_token = os.environ.get("HF_TOKEN")
-    if env_token:
-        config["hf_token"] = env_token
+    if not config.get("hf_token"):
+        config["hf_token"] = os.environ.get("HF_TOKEN", "")
 
 
 def format_timestamp(ts):
