@@ -111,7 +111,7 @@ def transcribe_with_speaches(resampled_path):
 
 def diarize_with_pyannote(resampled_path):
     pipeline = get_diarization_pipeline()
-    diarization = pipeline({"audio": str(resampled_path)})
+    diarization = pipeline({"audio": str(resampled_path)}, min_speakers=2)
 
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
