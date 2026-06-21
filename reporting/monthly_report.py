@@ -78,7 +78,7 @@ def query_ollama_for_report(transcript):
         'Format: {{"car_brands":["..."],"car_models":["..."],"topics":["..."]}}\n\n'
         "Transcript:\n{text}"
     )
-    result = query_ollama(text, prompt_template)
+    result = query_ollama(text, prompt_template, format_json=True)
     if not result:
         return {"car_brands": [], "car_models": [], "topics": []}
     try:

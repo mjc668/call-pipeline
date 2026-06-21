@@ -101,7 +101,7 @@ def build_daily_summary(date_str, entries):
     )
 
     print("  Generating narrative retell via Ollama ...")
-    retell = query_ollama(full_text, retell_prompt)
+    retell = query_ollama(full_text, retell_prompt, format_json=False)
     if not retell:
         retell = "*(no summary generated)*"
 

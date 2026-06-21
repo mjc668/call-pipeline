@@ -32,7 +32,7 @@ def load_ollama_config():
     return cfg
 
 
-def query_ollama(text, prompt_template, retries=3):
+def query_ollama(text, prompt_template, retries=3, format_json=False):
     if not text.strip():
         return ""
 
@@ -45,6 +45,8 @@ def query_ollama(text, prompt_template, retries=3):
         "prompt": prompt,
         "stream": False,
     }
+    if format_json:
+        payload["format"] = "json"
 
     for attempt in range(retries):
         try:
