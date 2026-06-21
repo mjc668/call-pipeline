@@ -26,7 +26,7 @@ def parse_monthly_files(month_prefix):
     if not paths:
         paths = sorted(OUTPUT_DIR.glob(f"{month_prefix}-*.md"))
     for path in paths:
-        content = path.read_text()
+        content = path.read_text(encoding="utf-8")
         for m in ENTRY_RE.finditer(content):
             hour = int(m.group(1).split(":")[0])
             caller = m.group(2).strip()

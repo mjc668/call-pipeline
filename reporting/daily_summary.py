@@ -32,7 +32,7 @@ def parse_date_entries(date_str):
         print(f"No transcription file found at {path}")
         return []
 
-    content = path.read_text()
+    content = path.read_text(encoding="utf-8")
     entries = []
     for m in ENTRY_RE.finditer(content):
         hour = int(m.group(1).split(":")[0])
