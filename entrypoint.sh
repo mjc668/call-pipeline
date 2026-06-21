@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+export LANG=C.UTF-8
 
 TZ=$(python3 -c "
 import yaml

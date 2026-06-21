@@ -368,7 +368,7 @@ def worker_loop():
 
                 print(f"  Writing entry to {output_file}")
                 output_file.parent.mkdir(parents=True, exist_ok=True)
-                with open(output_file, "a") as f:
+                with open(output_file, "a", encoding="utf-8") as f:
                     f.write(entry)
                 print(f"  Done: {call_id}")
 
